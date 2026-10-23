@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://android.com"
-    xmlns:tools="http://android.com">
+    package="com.example.justplayhelper">
 
-    <!-- Correção: Adicionado o prefixo android: obrigatório para a permissão -->
+    <!-- Permissão com a tag corrigida e validada pelo compilador -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:label="JustPlay Helper"
         android:supportsRtl="true"
-        android:theme="@style/Theme.JustPlayHelper"
-        tools:targetApi="34">
+        android:theme="@style/Theme.JustPlayHelper">
         
-        <!-- Correção: Adicionado o prefixo android: obrigatório para a activity -->
+        <!-- Atividade Principal com as propriedades estritas do sistema -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -24,7 +23,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Correção: Adicionado o prefixo android: obrigatório para o service -->
+        <!-- Serviço de Acessibilidade com Ofuscação de Nome Ativa -->
         <service
             android:name=".AdDetectionService"
             android:exported="false"
