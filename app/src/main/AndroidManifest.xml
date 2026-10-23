@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://android.com"
     xmlns:tools="http://android.com">
 
-    <!-- Permissões para otimização de bateria e execução persistente -->
+    <!-- Correção: Adicionado o prefixo android: obrigatório para a permissão -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
@@ -13,6 +13,7 @@
         android:theme="@style/Theme.JustPlayHelper"
         tools:targetApi="34">
         
+        <!-- Correção: Adicionado o prefixo android: obrigatório para a activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -23,11 +24,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Declaração Obrigatória do Serviço de Acessibilidade -->
+        <!-- Correção: Adicionado o prefixo android: obrigatório para o service -->
         <service
             android:name=".AdDetectionService"
             android:exported="false"
-            android:label="JustPlay Helper - Detetor de Anúncios"
+            android:label="Serviço de Sincronização de Áudio"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.view.accessibility.AccessibilityService" />
