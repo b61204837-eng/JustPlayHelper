@@ -13,6 +13,7 @@ jobs:
   build:
     name: Build JustPlayHelper APK
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -21,46 +22,60 @@ jobs:
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle' # Ativa a cache nativa e segura para dependências Gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install Android SDK components
+      - name: Locate Android project
+        shell: bash
         run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Verify Android project
-        run: |
-          echo "Checking Android project..."
-          test -d app
-          test -f settings.gradle.kts || test -f settings.gradle
-          test -f build.gradle.kts || test -f build.gradle
-
-      - name: Prepare Gradle Wrapper
-        run: |
-          if [ ! -f gradlew ]; then
-            echo "Gradle wrapper is missing."
-            echo "The project must include gradlew and gradle/wrapper files."
+          set -euo pipefail
+          echo "A verificar os ficheiros do projeto..."
+          if [ ! -d "app" ]; then
+            echo "ERRO: pasta app não encontrada."
             exit 1
           fi
-          chmod +x gradlew
+          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
+            echo "ERRO: ficheiro settings.gradle.kts ou settings.gradle não encontrado."
+            exit 1
+          fi
+          echo "Projeto Android encontrado."
+
+      - name: Make Gradle Wrapper executable
+        shell: bash
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+          else
+            echo "AVISO: O Gradle Wrapper não existe no repositório. A gerar com o Gradle do sistema..."
+            gradle wrapper
+            chmod +x ./gradlew
+          fi
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
-
-      - name: Verify APK
+        shell: bash
         run: |
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          set -euo pipefail
+          # O build-cache foi desativado temporariamente para garantir uma compilação limpa do Kotlin
+          ./gradlew --no-daemon --stacktrace --no-build-cache assembleDebug
+
+      - name: Verify and Prepare APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_PATH="$(find app/build/outputs/apk -type f -name '*.apk' -print -quit)"
+          if [ -z "$APK_PATH" ]; then
+            echo "ERRO: nenhum APK foi gerado."
+            exit 1
+          fi
+          echo "APK gerado: $APK_PATH"
+          mkdir -p release
+          cp "$APK_PATH" release/JustPlayHelper.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JustPlayHelper-debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: JustPlayHelper-APK
+          path: release/JustPlayHelper.apk
           if-no-files-found: error
+          retention-days: 7
