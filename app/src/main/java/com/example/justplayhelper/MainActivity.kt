@@ -1,140 +1,59 @@
 package com.example.justplayhelper
 
-import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
-import android.os.CountDownTimer
-import android.graphics.Typeface
-import android.view.Gravity
+import android.provider.Settings
+import android.text.TextUtils
 import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.SeekBar
-import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : Activity() {
-    private var timer: CountDownTimer? = null
-    private var duration = 30_000L
-    private var remaining = duration
-
-    private lateinit var display: TextView
-    private lateinit var status: TextView
-    private lateinit var startButton: Button
-    private lateinit var slider: SeekBar
+class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(24, 32, 24, 24)
+        
+        // Criação de um botão diretamente por código para simplificar e evitar dependências de XML de layout
+        val button = Button(this).apply {
+            text = "Ativar JustPlay Helper"
+            textSize = 18f
+            setPadding(40, 40, 40, 40)
         }
 
-        layout.addView(TextView(this).apply {
-            text = "JustPlay Helper"
-            textSize = 28f
-            gravity = Gravity.CENTER
-            setTypeface(null, Typeface.BOLD)
-        })
+        setContentView(button)
 
-        display = TextView(this).apply {
-            text = formatTime(remaining)
-            textSize = 44f
-            gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 16)
-        }
-        layout.addView(display)
-
-        val durationLabel = TextView(this).apply {
-            text = "Duração: 30 segundos"
-            textSize = 16f
-        }
-        layout.addView(durationLabel)
-
-        slider = SeekBar(this).apply {
-            max = 175
-            progress = 25
-        }
-        layout.addView(slider)
-
-        slider.setOnSeekBarChangeListener(
-            object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(
-                    bar: SeekBar?, value: Int, fromUser: Boolean
-                ) {
-                    if (timer == null) {
-                        duration = (value + 5) * 1000L
-                        remaining = duration
-                        display.text = formatTime(remaining)
-                    }
-                    durationLabel.text =
-                        "Duração: ${value + 5} segundos"
-                }
-
-                override fun onStartTrackingTouch(bar: SeekBar?) {}
-                override fun onStopTrackingTouch(bar: SeekBar?) {}
+        button.setOnClickListener {
+            if (!isAccessibilityServiceEnabled(this, AdDetectionService::class.java)) {
+                // Abre o ecrã de definições de acessibilidade do sistema Android
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(intent)
+                Toast.makeText(this, "Por favor, ative o 'JustPlay Helper' na lista", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "O serviço já está ativo e a funcionar sozinho!", Toast.LENGTH_SHORT).show()
             }
-        )
-
-        startButton = Button(this).apply {
-            text = "Iniciar temporizador"
         }
-        layout.addView(startButton)
-        startButton.setOnClickListener { startTimer() }
-
-        val stopButton = Button(this).apply {
-            text = "Parar / Reiniciar"
-        }
-        layout.addView(stopButton)
-        stopButton.setOnClickListener {
-            timer?.cancel()
-            timer = null
-            remaining = duration
-            display.text = formatTime(remaining)
-            status.text = "Temporizador parado."
-            startButton.isEnabled = true
-        }
-
-        status = TextView(this).apply {
-            text = "Pronto para começar."
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, 20, 0, 12)
-        }
-        layout.addView(status)
-
-        layout.addView(TextView(this).apply {
-            text = "Usa o temporizador como lembrete. " +
-                "Esta versão não controla anúncios nem garante recompensas."
-            textSize = 13f
-            gravity = Gravity.CENTER
-        })
-
-        setContentView(layout)
     }
 
-    private fun startTimer() {
-        timer?.cancel()
-        startButton.isEnabled = false
-        status.text = "Temporizador ativo."
+    /**
+     * Função auxiliar para verificar se o serviço de acessibilidade já foi ativado pelo utilizador.
+     */
+    private fun isAccessibilityServiceEnabled(context: Context, service: Class<*>): Boolean {
+        val expectedComponentName = "${context.packageName}/${service.name}"
+        val settingValue = Settings.Secure.getString(
+            context.content_contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
 
-        timer = object : CountDownTimer(remaining, 250) {
-            override fun onTick(ms: Long) {
-                remaining = ms
-                display.text = formatTime(ms)
+        val splitter = TextUtils.SimpleStringSplitter(':')
+        splitter.setString(settingValue)
+        while (splitter.hasNext()) {
+            val componentName = splitter.next()
+            if (componentName.equals(expectedComponentName, ignoreCase = true)) {
+                return true
             }
-
-            override fun onFinish() {
-                timer = null
-                remaining = 0
-                display.text = "00:00"
-                status.text = "Tempo terminado!"
-                startButton.isEnabled = true
-            }
-        }.start()
-    }
-
-    private fun formatTime(ms: Long): String {
-        val seconds = (ms / 1000).coerceAtLeast(0)
-        return "%02d:%02d".format(seconds / 60, seconds % 60)
+        }
+        return false
     }
 }
