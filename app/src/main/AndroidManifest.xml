@@ -1,32 +1,38 @@
-name: Build Android APK
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-on:
-  push:
-    branches:
-      - main
+    <application
+        android:label="AdCloser"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+        </activity>
 
-      # CORREÇÃO: Adicionado o "working-directory" para o GitHub encontrar o gradlew
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          build-root-directory: . # Altere para o nome da pasta se o projeto não estiver na raiz
+        <service
+            android:name=".AdDetectionService"
+            android:label="AdCloser - deteção de anúncios"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
 
-      # CORREÇÃO: Força o GitHub a dar permissão de execução e rodar o build no sítio certo
-      - name: Build Debug APK
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+
+        </service>
+
+    </application>
+
+</manifest>
