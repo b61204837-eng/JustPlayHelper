@@ -20,39 +20,51 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configurar Java 17
+      # 2. Configurar Java
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Configurar o Android SDK
+      # 3. Instalar Android SDK
       - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '12266719'
+        shell: bash
+        run: |
+          set -e
+
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "A verificar o sdkmanager..."
+
+          if ! command -v sdkmanager >/dev/null 2>&1; then
+            echo "::error::sdkmanager não encontrado no ambiente."
+            exit 1
+          fi
+
+          sdkmanager --version
 
       # 4. Aceitar licenças e instalar componentes
       - name: Install SDK components
         shell: bash
         run: |
           set -e
-          yes | sdkmanager --licenses
+
+          yes | sdkmanager --licenses || true
+
           sdkmanager \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      # 5. Verificar os ficheiros do projeto
+      # 5. Inspecionar o projeto
       - name: Find Android project
         shell: bash
         run: |
           echo "Ficheiros na raiz:"
           ls -la
 
-          echo "A procurar ficheiros Gradle:"
-          find . -maxdepth 5 \
+          echo "Ficheiros Gradle encontrados:"
+          find . -maxdepth 6 \
             -name gradlew \
             -o -name settings.gradle \
             -o -name settings.gradle.kts \
@@ -60,11 +72,69 @@ jobs:
             -o -name build.gradle.kts \
             -not -path './.git/*' -print
 
-      # 6. Localizar o projeto Android
+      # 6. Encontrar a pasta do projeto
       - name: Locate Gradle project
         id: project
         shell: bash
         run: |
           set -e
 
-          if
+          WRAPPER=$(find . -maxdepth 6 -type f -name gradlew \
+            -not -path './.git/*' | head -n 1)
+
+          if [ -z "$WRAPPER" ]; then
+            echo "::error::Não foi encontrado o ficheiro gradlew."
+            echo "O repositório precisa de conter um projeto Android Gradle."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$WRAPPER")
+
+          if [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
+             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            echo "::error::Não foi encontrado settings.gradle."
+            exit 1
+          fi
+
+          echo "Projeto encontrado em: $PROJECT_DIR"
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      # 7. Preparar Gradle
+      - name: Prepare Gradle
+        shell: bash
+        env:
+          PROJECT_DIR: ${{ steps.project.outputs.project_dir }}
+        run: |
+          set -e
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew --version
+
+      # 8. Compilar o APK
+      - name: Build APK
+        shell: bash
+        env:
+          PROJECT_DIR: ${{ steps.project.outputs.project_dir }}
+        run: |
+          set -e
+          cd "$PROJECT_DIR"
+          ./gradlew --no-daemon assembleDebug
+
+      # 9. Encontrar o APK criado
+      - name: Verify APK
+        id: verify
+        shell: bash
+        env:
+          PROJECT_DIR: ${{ steps.project.outputs.project_dir }}
+        run: |
+          set -e
+
+          APK=$(find "$PROJECT_DIR" \
+            -type f \
+            -path '*/build/outputs/apk/debug/*.apk' \
+            | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "::error::A compilação não produziu nenhum APK."
+            exit 1
+          fi
