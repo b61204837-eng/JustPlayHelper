@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build JustPlayHelper APK
 
 on:
   workflow_dispatch:
@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   build:
-    name: Build JustPlayHelper APK
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
@@ -27,47 +26,37 @@ jobs:
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
-        continue-on-error: true
-
-      - name: Configure Android SDK
-        run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
-          echo "${ANDROID_HOME:-/usr/local/lib/android/sdk}/platform-tools" >> "$GITHUB_PATH"
 
       - name: Install SDK components
         run: |
-          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          echo "SDK path: $SDK"
+          sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-          if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
-            echo "Android SDK command-line tools are missing."
-            exit 1
-          fi
-
-          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$SDK" --licenses || true
-
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" \
-            --sdk_root="$SDK" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-      - name: Verify project
+      - name: Find Android project
         run: |
-          test -f gradlew
-          test -f app/build.gradle.kts || test -f app/build.gradle
-          chmod +x gradlew
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+          echo "Repository files:"
+          ls -la
+          echo "Searching for Gradle files:"
+          find . -maxdepth 5 \( -name gradlew -o -name settings.gradle -o -name settings.gradle.kts \) -print
 
       - name: Build APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          elif [ -f gradlew.bat ]; then
+            echo "Windows Gradle wrapper found; gradlew is missing."
+            exit 1
+          else
+            echo "ERROR: gradlew not found in repository root."
+            echo "Check the project location printed in the previous step."
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: JustPlayHelper-APK
-          path: app/build/outputs/apk/debug/*.apk
+          path: '**/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
           retention-days: 7
