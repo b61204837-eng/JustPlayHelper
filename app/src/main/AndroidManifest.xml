@@ -1,37 +1,44 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://android.com"
+    xmlns:tools="http://android.com">
+
+    <!-- Permissões para otimização de bateria e execução persistente -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:label="AdCloser"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        android:allowBackup="false">
-
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.JustPlayHelper"
+        tools:targetApi="34">
+        
         <activity
             android:name=".MainActivity"
-            android:exported="true">
-
+            android:exported="true"
+            android:theme="@style/Theme.JustPlayHelper">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
 
+        <!-- Declaração Obrigatória do Serviço de Acessibilidade -->
         <service
             android:name=".AdDetectionService"
-            android:label="AdCloser - deteção de anúncios"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-
+            android:exported="false"
+            android:label="JustPlay Helper - Detetor de Anúncios"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
+                <action android:name="android.view.accessibility.AccessibilityService" />
             </intent-filter>
-
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
-
         </service>
 
     </application>
-
 </manifest>
