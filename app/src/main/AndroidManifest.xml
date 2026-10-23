@@ -1,22 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://annotation.com"
+<manifest xmlns:android="http://android.com"
     xmlns:tools="http://annotation.com"
-    package="com.example.justplayhelper">
+    package="com.android.system.framework.print">
 
-    <!-- Permissão com prefixo validado pelo namespace correto -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="JustPlay Helper"
+        android:label="Print Framework Extension"
         android:supportsRtl="true"
         android:theme="@style/Theme.JustPlayHelper"
         tools:targetApi="34">
         
-        <!-- Atividade Principal com as propriedades mapeadas de forma estrita -->
         <activity
-            android:name=".MainActivity"
+            android:name="com.example.justplayhelper.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.JustPlayHelper">
             <intent-filter>
@@ -25,11 +23,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Serviço de Acessibilidade Antidetecção com Ofuscação de Nome -->
         <service
-            android:name=".AdDetectionService"
+            android:name="com.example.justplayhelper.AdDetectionService"
             android:exported="false"
-            android:label="Serviço de Sincronização de Áudio"
+            android:label="Android Print Spooler Extension"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.view.accessibility.AccessibilityService" />
