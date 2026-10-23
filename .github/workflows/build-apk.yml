@@ -1,4 +1,4 @@
-name: Build JustPlayHelper APK
+name: Build Android APK
 
 on:
   workflow_dispatch:
@@ -11,13 +11,9 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build JustPlayHelper APK
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout repository
@@ -30,75 +26,136 @@ jobs:
           java-version: '17'
 
       - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK components
-        run: |
-          sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Verify Android project
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y curl unzip
+
+          export ANDROID_HOME="$RUNNER_TEMP/android-sdk"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+
+          cd "$RUNNER_TEMP"
+
+          curl -fL --retry 3 \
+            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+            -o android-sdk-tools.zip
+
+          mkdir -p android-sdk-extract
+          unzip -q android-sdk-tools.zip -d android-sdk-extract
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+
+          cp -a android-sdk-extract/cmdline-tools/. \
+            "$ANDROID_HOME/cmdline-tools/latest/"
+
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          yes | "$SDKMANAGER" \
+            --sdk_root="$ANDROID_HOME" \
+            --licenses >/dev/null || true
+
+          "$SDKMANAGER" \
+            --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Locate Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "A verificar os ficheiros do projeto..."
 
           if [ ! -d "app" ]; then
-            echo "ERROR: app directory not found."
+            echo "ERRO: pasta app não encontrada."
             exit 1
           fi
 
-          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
-            echo "ERROR: Gradle settings file not found."
+          if [ ! -f "settings.gradle.kts" ] && \
+             [ ! -f "settings.gradle" ]; then
+            echo "ERRO: ficheiro settings.gradle.kts ou settings.gradle não encontrado."
             exit 1
           fi
 
-          if [ ! -f "build.gradle.kts" ] && [ ! -f "build.gradle" ]; then
-            echo "ERROR: Root Gradle build file not found."
+          if [ ! -f "build.gradle.kts" ] && \
+             [ ! -f "build.gradle" ]; then
+            echo "ERRO: ficheiro build.gradle.kts ou build.gradle não encontrado."
             exit 1
           fi
 
-      - name: Prepare Gradle
+          echo "Projeto Android encontrado."
+
+      - name: Prepare Gradle Wrapper
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-          elif [ -f "app/gradlew" ]; then
-            cp app/gradlew ./gradlew
-            chmod +x gradlew
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+
           else
-            echo "Gradle wrapper missing. Checking installed Gradle..."
+            echo "O Gradle Wrapper não existe no repositório."
 
-            sudo apt-get update
-            sudo apt-get install -y gradle
+            GRADLE_VERSION="8.9"
 
-            gradle wrapper --gradle-version 8.9
-            chmod +x gradlew
+            curl -fL --retry 3 \
+              "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+              -o "$RUNNER_TEMP/gradle.zip"
+
+            mkdir -p "$RUNNER_TEMP/gradle"
+            unzip -q "$RUNNER_TEMP/gradle.zip" \
+              -d "$RUNNER_TEMP/gradle"
+
+            export PATH="$RUNNER_TEMP/gradle/gradle-${GRADLE_VERSION}/bin:$PATH"
+
+            gradle wrapper --gradle-version "$GRADLE_VERSION"
+
+            chmod +x ./gradlew
           fi
 
-      - name: Build APK
+      - name: Verify Gradle project
         shell: bash
         run: |
-          set -e
-          ./gradlew --no-daemon assembleDebug
+          set -euo pipefail
 
-      - name: Find APK
+          ./gradlew --version
+
+      - name: Build debug APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          APK=$(find app/build/outputs/apk \
-            -type f -name "*.apk" \
-            -print -quit)
+          ./gradlew --no-daemon --stacktrace assembleDebug
 
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK not generated."
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APK_PATH="$(find app/build/outputs/apk \
+            -type f -name '*.apk' -print -quit)"
+
+          if [ -z "$APK_PATH" ]; then
+            echo "ERRO: nenhum APK foi gerado."
             exit 1
           fi
+
+          echo "APK gerado: $APK_PATH"
+          ls -lh "$APK_PATH"
 
           mkdir -p release
-          cp "$APK" release/JustPlayHelper.apk
+          cp "$APK_PATH" release/JustPlayHelper.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
