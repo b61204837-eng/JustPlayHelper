@@ -1,46 +1,32 @@
-name: Build Android APK
+name: Android CI Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout do código
+      uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+    - name: Configurar o JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'gradle'
 
-      # Solução Dinâmica: Encontra o ficheiro gradlew de forma automática em qualquer pasta, dá permissão e compila o APK
-      - name: Locate Gradle and Build Debug APK
-        run: |
-          GRADLEW_PATH=$(find . -name "gradlew" -print -quit)
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "ERRO: O ficheiro gradlew nao foi encontrado no repositório!"
-            exit 1
-          fi
-          GRADLEW_DIR=$(dirname "$GRADLEW_PATH")
-          echo "Projeto Gradle encontrado em: $GRADLEW_DIR"
-          cd "$GRADLEW_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug
+    # CORREÇÃO: Este passo força a criação do gradlew se ele não existir
+    - name: Garantir que o Gradle Wrapper existe
+      run: gradle wrapper
 
-      # Localiza o APK gerado automaticamente (seja qual for a pasta interna) e faz o upload para as Releases
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: JustPlay Helper v1.0.${{ github.run_number }}
-          draft: false
-          prerelease: false
-          files: "**/build/outputs/apk/debug/app-debug.apk"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Dar permissão de execução ao gradlew
+      run: chmod +x gradlew
+
+    - name: Compilar o APK (Debug)
+      run: ./gradlew assembleDebug
