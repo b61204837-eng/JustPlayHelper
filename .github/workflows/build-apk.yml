@@ -6,41 +6,80 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build JustPlayHelper APK
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
 
     steps:
+      # 1. Transferir o código do repositório
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Instalar Java 17
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
+      # 3. Preparar o Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '12.0'
 
+      # 4. Aceitar licenças e instalar componentes Android
       - name: Install Android SDK components
         run: |
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
+      # 5. Verificar os ficheiros do projeto
+      - name: Verify project files
+        run: |
+          echo "Verificando ficheiros do projeto..."
+          test -f settings.gradle.kts || test -f settings.gradle
+          test -f build.gradle.kts || test -f build.gradle
+          test -f app/build.gradle.kts || test -f app/build.gradle
+          echo "Ficheiros principais encontrados."
+
+      # 6. Preparar o Gradle
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build APK
+      # 7. Dar permissão ao Gradle Wrapper, se existir
+      - name: Prepare Gradle Wrapper
         run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+          else
+            echo "ERRO: gradlew não existe na raiz do projeto."
+            exit 1
+          fi
 
+      # 8. Compilar a aplicação Android
+      - name: Build APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      # 9. Verificar se o APK foi criado
+      - name: Verify APK
+        run: |
+          if ! find app/build/outputs/apk/debug -maxdepth 1 -name "*.apk" -print -quit | grep -q .; then
+            echo "ERRO: Nenhum APK foi encontrado."
+            exit 1
+          fi
+          echo "APK criado com sucesso:"
+          find app/build/outputs/apk/debug -maxdepth 1 -name "*.apk" -print
+
+      # 10. Disponibilizar o APK para download
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: JustPlayHelper-APK
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 7
