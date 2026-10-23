@@ -30,108 +30,75 @@ jobs:
           java-version: '17'
 
       - name: Install Android SDK
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
-          if [ ! -x "$SDKMANAGER" ]; then
-            cd /tmp
-            curl -fL \
-              https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
-              -o android-tools.zip
-
-            mkdir -p android-tools
-            unzip -q android-tools.zip -d android-tools
-
-            mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-
-            cp -a android-tools/cmdline-tools/. \
-              "$ANDROID_HOME/cmdline-tools/latest/"
-          fi
-
-          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-
-          "$SDKMANAGER" --version
-
-      - name: Accept Android SDK licenses
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          yes | sdkmanager --licenses || true
+        uses: android-actions/setup-android@v3
 
       - name: Install SDK components
+        run: |
+          sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Verify Android project
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-      - name: Locate Android project
-        id: project
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ -f "gradlew" ]; then
-            echo "dir=." >> "$GITHUB_OUTPUT"
-          elif [ -f "app/gradlew" ]; then
-            echo "dir=app" >> "$GITHUB_OUTPUT"
-          else
-            echo "ERROR: Gradle wrapper not found."
-            echo "The repository must contain gradlew."
+          if [ ! -d "app" ]; then
+            echo "ERROR: app directory not found."
             exit 1
           fi
 
-      - name: Verify Gradle project
-        working-directory: ${{ steps.project.outputs.dir }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          chmod +x gradlew
-
-          if [ ! -f "settings.gradle" ] &&
-             [ ! -f "settings.gradle.kts" ]; then
+          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
             echo "ERROR: Gradle settings file not found."
             exit 1
           fi
 
-      - name: Build debug APK
-        working-directory: ${{ steps.project.outputs.dir }}
+          if [ ! -f "build.gradle.kts" ] && [ ! -f "build.gradle" ]; then
+            echo "ERROR: Root Gradle build file not found."
+            exit 1
+          fi
+
+      - name: Prepare Gradle
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
+
+          if [ -f "gradlew" ]; then
+            chmod +x gradlew
+          elif [ -f "app/gradlew" ]; then
+            cp app/gradlew ./gradlew
+            chmod +x gradlew
+          else
+            echo "Gradle wrapper missing. Checking installed Gradle..."
+
+            sudo apt-get update
+            sudo apt-get install -y gradle
+
+            gradle wrapper --gradle-version 8.9
+            chmod +x gradlew
+          fi
+
+      - name: Build APK
+        shell: bash
+        run: |
+          set -e
           ./gradlew --no-daemon assembleDebug
 
-      - name: Verify APK
+      - name: Find APK
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
-          APK="$(find . \
-            -type f \
-            -path "*/build/outputs/apk/*/*.apk" \
-            ! -path "*/build/outputs/apk/androidTest/*" \
-            -print -quit)"
+          APK=$(find app/build/outputs/apk \
+            -type f -name "*.apk" \
+            -print -quit)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: No APK was generated."
+            echo "ERROR: APK not generated."
             exit 1
           fi
 
           mkdir -p release
           cp "$APK" release/JustPlayHelper.apk
-
-          echo "APK created successfully."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
