@@ -1,59 +1,89 @@
 package com.example.justplayhelper
 
-import android.content.Context
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
-import android.text.TextUtils
+import android.view.Gravity
 import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.Switch
+import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
+
+    private val prefs by lazy {
+        getSharedPreferences("adcloser_settings", MODE_PRIVATE)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Criação de um botão diretamente por código para simplificar e evitar dependências de XML de layout
-        val button = Button(this).apply {
-            text = "Ativar JustPlay Helper"
-            textSize = 18f
-            setPadding(40, 40, 40, 40)
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(24, 32, 24, 24)
         }
 
-        setContentView(button)
+        layout.addView(TextView(this).apply {
+            text = "AdCloser"
+            textSize = 30f
+            gravity = Gravity.CENTER
+        })
 
-        button.setOnClickListener {
-            if (!isAccessibilityServiceEnabled(this, AdDetectionService::class.java)) {
-                // Abre o ecrã de definições de acessibilidade do sistema Android
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
-                Toast.makeText(this, "Por favor, ative o 'JustPlay Helper' na lista", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "O serviço já está ativo e a funcionar sozinho!", Toast.LENGTH_SHORT).show()
+        layout.addView(TextView(this).apply {
+            text = "Deteção de anúncios e regresso da Google Play"
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(0, 20, 0, 20)
+        })
+
+        val closeSwitch = Switch(this).apply {
+            text = "Tentar fechar anúncios reconhecidos"
+            isChecked = prefs.getBoolean("auto_close", true)
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("auto_close", checked).apply()
             }
         }
-    }
+        layout.addView(closeSwitch)
 
-    /**
-     * Função auxiliar para verificar se o serviço de acessibilidade já foi ativado pelo utilizador.
-     */
-    private fun isAccessibilityServiceEnabled(context: Context, service: Class<*>): Boolean {
-        val expectedComponentName = "${context.packageName}/${service.name}"
-        val settingValue = Settings.Secure.getString(
-            context.content_contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-
-        val splitter = TextUtils.SimpleStringSplitter(':')
-        splitter.setString(settingValue)
-        while (splitter.hasNext()) {
-            val componentName = splitter.next()
-            if (componentName.equals(expectedComponentName, ignoreCase = true)) {
-                return true
+        val returnSwitch = Switch(this).apply {
+            text = "Regressar quando abrir a Google Play"
+            isChecked = prefs.getBoolean("auto_return_play", true)
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("auto_return_play", checked).apply()
             }
         }
-        return false
+        layout.addView(returnSwitch)
+
+        layout.addView(Button(this).apply {
+            text = "Ativar serviço de Acessibilidade"
+            setOnClickListener {
+                startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                )
+            }
+        })
+
+        layout.addView(Button(this).apply {
+            text = "Testar aviso"
+            setOnClickListener {
+                Toast.makeText(
+                    this@MainActivity,
+                    "AdCloser está a funcionar.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        })
+
+        layout.addView(TextView(this).apply {
+            text = "O funcionamento depende dos elementos acessíveis de cada aplicação. Nem todos os anúncios podem ser fechados automaticamente."
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(0, 24, 0, 0)
+        })
+
+        setContentView(layout)
     }
 }
