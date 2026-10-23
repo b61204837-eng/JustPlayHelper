@@ -30,11 +30,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Define o caminho explícito para o executável do sdkmanager
+          # Localiza o caminho absoluto do sdkmanager no runner
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           
           echo "A aceitar licenças do Android SDK..."
-          yes | "$SDKMANAGER" --licenses > /dev/null
+          # O "|| true" previne que o erro de Broken pipe do utilitário 'yes' quebre o build
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
           
           echo "A instalar os componentes da API 35..."
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
