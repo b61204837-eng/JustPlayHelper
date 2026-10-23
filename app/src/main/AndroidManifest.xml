@@ -1,18 +1,32 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://android.com" xmlns:tools="http://annotation.com" package="com.android.system.framework.print">
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <application android:allowBackup="false" android:icon="@mipmap/ic_launcher" android:label="Print Framework Extension" android:supportsRtl="true" android:theme="@style/Theme.JustPlayHelper" tools:targetApi="34">
-        <activity android:name="com.example.justplayhelper.MainActivity" android:exported="true" android:theme="@style/Theme.JustPlayHelper">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        <service android:name="com.example.justplayhelper.AdDetectionService" android:exported="false" android:label="Android Print Spooler Extension" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.view.accessibility.AccessibilityService" />
-            </intent-filter>
-            <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
-        </service>
-    </application>
-</manifest>
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # CORREÇÃO: Adicionado o "working-directory" para o GitHub encontrar o gradlew
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          build-root-directory: . # Altere para o nome da pasta se o projeto não estiver na raiz
+
+      # CORREÇÃO: Força o GitHub a dar permissão de execução e rodar o build no sítio certo
+      - name: Build Debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
