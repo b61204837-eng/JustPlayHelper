@@ -13,7 +13,7 @@ jobs:
   build:
     name: Build JustPlayHelper APK
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -22,138 +22,58 @@ jobs:
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle' # Ativa a cache automática do Gradle para builds mais rápidos
 
-      - name: Install Android SDK
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          sudo apt-get update
-          sudo apt-get install -y curl unzip
-
-          export ANDROID_HOME="$RUNNER_TEMP/android-sdk"
-          export ANDROID_SDK_ROOT="$ANDROID_HOME"
-
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-
-          cd "$RUNNER_TEMP"
-
-          curl -fL --retry 3 \
-            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
-            -o android-sdk-tools.zip
-
-          mkdir -p android-sdk-extract
-          unzip -q android-sdk-tools.zip -d android-sdk-extract
-
-          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-
-          cp -a android-sdk-extract/cmdline-tools/. \
-            "$ANDROID_HOME/cmdline-tools/latest/"
-
-          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
-          yes | "$SDKMANAGER" \
-            --sdk_root="$ANDROID_HOME" \
-            --licenses >/dev/null || true
-
-          "$SDKMANAGER" \
-            --sdk_root="$ANDROID_HOME" \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 35
+          build-tools: 35.0.0
 
       - name: Locate Android project
         shell: bash
         run: |
           set -euo pipefail
-
           echo "A verificar os ficheiros do projeto..."
-
           if [ ! -d "app" ]; then
             echo "ERRO: pasta app não encontrada."
             exit 1
           fi
-
-          if [ ! -f "settings.gradle.kts" ] && \
-             [ ! -f "settings.gradle" ]; then
+          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
             echo "ERRO: ficheiro settings.gradle.kts ou settings.gradle não encontrado."
             exit 1
           fi
-
-          if [ ! -f "build.gradle.kts" ] && \
-             [ ! -f "build.gradle" ]; then
-            echo "ERRO: ficheiro build.gradle.kts ou build.gradle não encontrado."
-            exit 1
-          fi
-
           echo "Projeto Android encontrado."
 
-      - name: Prepare Gradle Wrapper
+      - name: Make Gradle Wrapper executable
         shell: bash
         run: |
-          set -euo pipefail
-
           if [ -f "./gradlew" ]; then
             chmod +x ./gradlew
-
           else
-            echo "O Gradle Wrapper não existe no repositório."
-
-            GRADLE_VERSION="8.9"
-
-            curl -fL --retry 3 \
-              "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
-              -o "$RUNNER_TEMP/gradle.zip"
-
-            mkdir -p "$RUNNER_TEMP/gradle"
-            unzip -q "$RUNNER_TEMP/gradle.zip" \
-              -d "$RUNNER_TEMP/gradle"
-
-            export PATH="$RUNNER_TEMP/gradle/gradle-${GRADLE_VERSION}/bin:$PATH"
-
-            gradle wrapper --gradle-version "$GRADLE_VERSION"
-
+            echo "AVISO: O Gradle Wrapper não existe no repositório. A gerar com Gradle local..."
+            gradle wrapper
             chmod +x ./gradlew
           fi
-
-      - name: Verify Gradle project
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ./gradlew --version
 
       - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
-
           ./gradlew --no-daemon --stacktrace assembleDebug
 
-      - name: Verify APK
+      - name: Verify and Prepare APK
         shell: bash
         run: |
           set -euo pipefail
-
-          APK_PATH="$(find app/build/outputs/apk \
-            -type f -name '*.apk' -print -quit)"
-
+          APK_PATH="$(find app/build/outputs/apk -type f -name '*.apk' -print -quit)"
           if [ -z "$APK_PATH" ]; then
             echo "ERRO: nenhum APK foi gerado."
             exit 1
           fi
-
           echo "APK gerado: $APK_PATH"
-          ls -lh "$APK_PATH"
-
           mkdir -p release
           cp "$APK_PATH" release/JustPlayHelper.apk
 
