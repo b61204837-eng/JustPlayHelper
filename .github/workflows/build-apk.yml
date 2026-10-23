@@ -13,7 +13,6 @@ jobs:
   build:
     name: Build JustPlayHelper APK
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -22,73 +21,46 @@ jobs:
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Accept Android Licenses & Install SDK components
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Localiza o caminho absoluto do sdkmanager no runner
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          
-          echo "A aceitar licenças do Android SDK..."
-          # O "|| true" previne que o erro de Broken pipe do utilitário 'yes' quebre o build
-          yes | "$SDKMANAGER" --licenses > /dev/null || true
-          
-          echo "A instalar os componentes da API 35..."
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Locate Android project
-        shell: bash
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install Android SDK components
         run: |
-          set -euo pipefail
-          echo "A verificar os ficheiros do projeto..."
-          if [ ! -d "app" ]; then
-            echo "ERRO: pasta app não encontrada."
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Verify Android project
+        run: |
+          echo "Checking Android project..."
+          test -d app
+          test -f settings.gradle.kts || test -f settings.gradle
+          test -f build.gradle.kts || test -f build.gradle
+
+      - name: Prepare Gradle Wrapper
+        run: |
+          if [ ! -f gradlew ]; then
+            echo "Gradle wrapper is missing."
+            echo "The project must include gradlew and gradle/wrapper files."
             exit 1
           fi
-          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
-            echo "ERRO: ficheiro settings.gradle.kts ou settings.gradle não encontrado."
-            exit 1
-          fi
-          echo "Projeto Android encontrado."
-
-      - name: Make Gradle Wrapper executable
-        shell: bash
-        run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-          else
-            echo "AVISO: O Gradle Wrapper não existe no repositório. A gerar com o Gradle do sistema..."
-            gradle wrapper
-            chmod +x ./gradlew
-          fi
+          chmod +x gradlew
 
       - name: Build debug APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./gradlew --no-daemon --stacktrace assembleDebug
+        run: ./gradlew --no-daemon assembleDebug
 
-      - name: Verify and Prepare APK
-        shell: bash
+      - name: Verify APK
         run: |
-          set -euo pipefail
-          APK_PATH="$(find app/build/outputs/apk -type f -name '*.apk' -print -quit)"
-          if [ -z "$APK_PATH" ]; then
-            echo "ERRO: nenhum APK foi gerado."
-            exit 1
-          fi
-          echo "APK gerado: $APK_PATH"
-          mkdir -p release
-          cp "$APK_PATH" release/JustPlayHelper.apk
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: JustPlayHelper-APK
-          path: release/JustPlayHelper.apk
+          name: JustPlayHelper-debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 7
