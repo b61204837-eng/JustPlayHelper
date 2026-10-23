@@ -1,1 +1,51 @@
+name: Build Android APK
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - principal
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obter codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Preparar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Verificar projeto
+        run: ls -la
+
+      - name: Compilar APK
+        run: |
+          if [ -f "settings.gradle.kts" ]; then
+            gradle assembleDebug
+          elif [ -f "JustPlayHelperMobile/settings.gradle.kts" ]; then
+            gradle -p JustPlayHelperMobile assembleDebug
+          else
+            echo "Projeto Android nao encontrado."
+            exit 1
+          fi
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: JustPlayHelper-APK
+          path: "**/build/outputs/apk/debug/*.apk"
+          if-no-files-found: error
