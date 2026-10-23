@@ -29,11 +29,15 @@ jobs:
       - name: Accept Android Licenses & Install SDK components
         shell: bash
         run: |
-          # Aceita todas as licenças usando o sdkmanager nativo pré-instalado no runner do GitHub
-          yes | sdkmanager --licenses > /dev/null
+          set -euo pipefail
+          # Define o caminho explícito para o executável do sdkmanager
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           
-          # Instala apenas os componentes necessários e válidos para a API 35 (sem chamar o pacote 'tools' antigo)
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          echo "A aceitar licenças do Android SDK..."
+          yes | "$SDKMANAGER" --licenses > /dev/null
+          
+          echo "A instalar os componentes da API 35..."
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Locate Android project
         shell: bash
