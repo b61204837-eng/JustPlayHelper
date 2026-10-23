@@ -15,6 +15,10 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,30 +28,62 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '11076708'
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -x "$SDKMANAGER" ]; then
+            cd /tmp
+            curl -fL \
+              https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+              -o android-tools.zip
+
+            mkdir -p android-tools
+            unzip -q android-tools.zip -d android-tools
+
+            mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+
+            cp -a android-tools/cmdline-tools/. \
+              "$ANDROID_HOME/cmdline-tools/latest/"
+          fi
+
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
+          "$SDKMANAGER" --version
 
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install Android SDK components
+        shell: bash
         run: |
+          set -euo pipefail
+
+          yes | sdkmanager --licenses || true
+
+      - name: Install SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+
           sdkmanager \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Find Android project
+      - name: Locate Android project
         id: project
         shell: bash
         run: |
-          if [ -f "./gradlew" ]; then
+          set -euo pipefail
+
+          if [ -f "gradlew" ]; then
             echo "dir=." >> "$GITHUB_OUTPUT"
-          elif [ -f "./app/gradlew" ]; then
+          elif [ -f "app/gradlew" ]; then
             echo "dir=app" >> "$GITHUB_OUTPUT"
           else
             echo "ERROR: Gradle wrapper not found."
@@ -55,32 +91,47 @@ jobs:
             exit 1
           fi
 
-      - name: Verify Gradle wrapper
+      - name: Verify Gradle project
         working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
         run: |
-          chmod +x ./gradlew
-          test -f gradlew
-          test -f settings.gradle || test -f settings.gradle.kts
+          set -euo pipefail
+
+          chmod +x gradlew
+
+          if [ ! -f "settings.gradle" ] &&
+             [ ! -f "settings.gradle.kts" ]; then
+            echo "ERROR: Gradle settings file not found."
+            exit 1
+          fi
 
       - name: Build debug APK
         working-directory: ${{ steps.project.outputs.dir }}
-        run: ./gradlew --no-daemon assembleDebug
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon assembleDebug
 
       - name: Verify APK
         shell: bash
         run: |
-          APK=$(find . -type f -path "*/build/outputs/apk/*/*.apk" \
+          set -euo pipefail
+
+          APK="$(find . \
+            -type f \
+            -path "*/build/outputs/apk/*/*.apk" \
             ! -path "*/build/outputs/apk/androidTest/*" \
-            -print -quit)
+            -print -quit)"
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated."
+            echo "ERROR: No APK was generated."
             exit 1
           fi
 
-          echo "APK generated: $APK"
           mkdir -p release
           cp "$APK" release/JustPlayHelper.apk
+
+          echo "APK created successfully."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
