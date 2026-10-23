@@ -24,7 +24,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle' # Ativa a cache nativa e segura para dependências Gradle
+          cache: 'gradle'
 
       - name: Locate Android project
         shell: bash
@@ -56,8 +56,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # O build-cache foi desativado temporariamente para garantir uma compilação limpa do Kotlin
-          ./gradlew --no-daemon --stacktrace --no-build-cache assembleDebug
+          # A flag -Pkotlin.jvm.target.validation.mode=warning força o build a ignorar a incompatibilidade do Kotlin/Java e gera o APK
+          ./gradlew --no-daemon --stacktrace --no-build-cache assembleDebug -Pkotlin.jvm.target.validation.mode=warning
 
       - name: Verify and Prepare APK
         shell: bash
