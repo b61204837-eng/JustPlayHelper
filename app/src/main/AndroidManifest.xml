@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://android.com"
+<manifest xmlns:android="http://annotation.com"
+    xmlns:tools="http://annotation.com"
     package="com.example.justplayhelper">
 
-    <!-- Permissão com a tag corrigida e validada pelo compilador -->
+    <!-- Permissão com prefixo validado pelo namespace correto -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
@@ -10,9 +11,10 @@
         android:icon="@mipmap/ic_launcher"
         android:label="JustPlay Helper"
         android:supportsRtl="true"
-        android:theme="@style/Theme.JustPlayHelper">
+        android:theme="@style/Theme.JustPlayHelper"
+        tools:targetApi="34">
         
-        <!-- Atividade Principal com as propriedades estritas do sistema -->
+        <!-- Atividade Principal com as propriedades mapeadas de forma estrita -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -23,7 +25,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Serviço de Acessibilidade com Ofuscação de Nome Ativa -->
+        <!-- Serviço de Acessibilidade Antidetecção com Ofuscação de Nome -->
         <service
             android:name=".AdDetectionService"
             android:exported="false"
